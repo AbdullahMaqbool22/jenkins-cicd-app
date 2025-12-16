@@ -7,20 +7,37 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 15s
+      evaluation_interval: 15s
 
     scrape_configs:
-      - job_name: 'kubernetes-nodes'
-        kubernetes_sd_configs:
-          - role: node
 
+      # 1️⃣ Kubernetes Pods (THIS IS MOST IMPORTANT)
       - job_name: 'kubernetes-pods'
         kubernetes_sd_configs:
           - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+)
+            replacement: $1
 
-      - job_name: 'jenkins'
-        static_configs:
-          - targets: ['jenkins:8080']
+      # 2️⃣ Kubernetes Nodes (OPTIONAL – may show DOWN, acceptable)
+      - job_name: 'kubernetes-nodes'
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true
+        kubernetes_sd_configs:
+          - role: node
 
-      - job_name: 'app'
+      # 3️⃣ Your Python Web App
+      - job_name: 'python-webapp'
         static_configs:
           - targets: ['python-webapp-service:80']
